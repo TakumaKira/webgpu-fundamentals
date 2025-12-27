@@ -158,6 +158,11 @@ async function main() {
   
   console.log('GPU result', gpuResult);
 
+  displayResults(null, gpuTime);
+
+  // Wait a bit to render the result only with GPU time
+  await new Promise(resolve => setTimeout(resolve, 25));
+
   // Clean up GPU buffers before running CPU computation
   resultBuffer.unmap();
 
@@ -175,16 +180,20 @@ async function main() {
 main();
 
 function displayResults(cpuTime, gpuTime) {
-  const speedup = cpuTime / gpuTime;
+  const speedup = cpuTime && gpuTime ? cpuTime / gpuTime : null;
   const resultsDiv = document.getElementById('results');
 
   resultsDiv.innerHTML = `
     <h2>Performance Comparison</h2>
-    <p>CPU Time: ${cpuTime.toFixed(2)} ms</p>
-    <p>GPU Time: ${gpuTime.toFixed(2)} ms</p>
-    <p>Speedup: ${speedup.toFixed(2)}x (GPU is ${speedup.toFixed(2)} times faster)</p>
+    <p>CPU Time: ${cpuTime?.toFixed(2) ?? 'N/A'} ms</p>
+    <p>GPU Time: ${gpuTime?.toFixed(2) ?? 'N/A'} ms</p>
+    <p>Speedup: ${speedup?.toFixed(2) ?? 'N/A'}x (GPU is ${speedup?.toFixed(2) ?? 'N/A'} times faster)</p>
     <p>See console for more details</p>
   `;
+
+  if (!cpuTime || !gpuTime) {
+    return;
+  }
 
   console.log(`\n=== Performance Comparison ===`);
   console.log(`CPU Time: ${cpuTime.toFixed(2)} ms`);
