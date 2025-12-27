@@ -28,7 +28,10 @@ async function main() {
     },
   });
 
-  const input = new Float32Array([1, 3, 5]);
+  const input = new Float32Array(100000);
+  for (let i = 0; i < input.length; i++) {
+    input[i] = Math.random() * 100;
+  }
 
   // create a buffer on the GPU to hold our computation input
   const inputBuffer = device.createBuffer({
@@ -73,7 +76,7 @@ async function main() {
   });
   pass.setPipeline(pipeline);
   pass.setBindGroup(0, bindGroup);
-  pass.dispatchWorkgroups(input.length);
+  pass.dispatchWorkgroups(Math.ceil(input.length / 64));
   pass.end();
 
   // Encode a command to copy the results to a mappable buffer.
