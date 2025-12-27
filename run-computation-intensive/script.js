@@ -9,13 +9,13 @@ async function main() {
   const module = device.createShaderModule({
     label: 'doubling compute module',
     code: /* wgsl */ `
-      @group(0) @binding(0) var<storage, read_write> data: array<f32>;
- 
-      @compute @workgroup_size(1) fn computeSomething(
-        @builtin(global_invocation_id) id: vec3u
-      ) {
+      @group(0) @binding(0) var<storage, read> input: array<f32>;
+      @group(0) @binding(1) var<storage, read_write> output: array<f32>;
+    
+      @compute @workgroup_size(64)
+      fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let i = id.x;
-        data[i] = data[i] * 2.0;
+        output[i] = clamp(input[i] * 2.0 + 10.0, 0.0, 100.0);
       }
     `,
   });
@@ -30,15 +30,21 @@ async function main() {
 
   const input = new Float32Array([1, 3, 5]);
 
-  // create a buffer on the GPU to hold our computation
-  // input and output
-  const workBuffer = device.createBuffer({
-    label: 'work buffer',
+  // create a buffer on the GPU to hold our computation input
+  const inputBuffer = device.createBuffer({
+    label: 'input buffer',
     size: input.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
   // Copy our input data to that buffer
-  device.queue.writeBuffer(workBuffer, 0, input);
+  device.queue.writeBuffer(inputBuffer, 0, input);
+
+  // create a buffer on the GPU to hold our computation output
+  const outputBuffer = device.createBuffer({
+    label: 'output buffer',
+    size: input.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+  });
 
   // create a buffer on the GPU to get a copy of the results
   const resultBuffer = device.createBuffer({
@@ -48,12 +54,13 @@ async function main() {
   });
 
   // Setup a bindGroup to tell the shader which
-  // buffer to use for the computation
+  // buffers to use for the computation
   const bindGroup = device.createBindGroup({
-    label: 'bindGroup for work buffer',
+    label: 'bindGroup for input and output buffers',
     layout: pipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: { buffer: workBuffer } },
+      { binding: 0, resource: { buffer: inputBuffer } },
+      { binding: 1, resource: { buffer: outputBuffer } },
     ],
   });
 
@@ -70,7 +77,7 @@ async function main() {
   pass.end();
 
   // Encode a command to copy the results to a mappable buffer.
-  encoder.copyBufferToBuffer(workBuffer, 0, resultBuffer, 0, resultBuffer.size);
+  encoder.copyBufferToBuffer(outputBuffer, 0, resultBuffer, 0, resultBuffer.size);
 
   // Finish encoding and submit the commands
   const commandBuffer = encoder.finish();
